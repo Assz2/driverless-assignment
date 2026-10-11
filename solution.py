@@ -54,6 +54,7 @@ def path_length(points: List[Point], path: List[int]) -> float:
 # Step 3 -- Data association (yours to implement)
 # ---------------------------------------------------------------------------
 
+DISTANCE_SEARCH = 1.0 # arbitrary distance threshold
 def associate(map_points: Map, observations: List[Point]) -> List[Tuple[int, int]]:
     """Associate every observation with the map point it was generated from.
 
@@ -65,7 +66,26 @@ def associate(map_points: Map, observations: List[Point]) -> List[Tuple[int, int
         tuples, e.g. ``[(0, 12), (3, 5)]`` means that observation 12 was
         generated from map point 0, and observation 5 from map point 3.
     """
-    raise NotImplementedError("Step 3 (data association) is yours to implement")
+    # (map_index, obs_index) : distance
+    association_dict : dict[Tuple[int, int], float] = {}
+    used_observations : set[Point] = set()
+
+    for map_index, map_point in enumerate(map_points):
+        for obs_index, obs_point in enumerate(observations):
+            # search distance from map point to each observation point
+            computed_distance = math.dist(map_point, obs_point)
+            is_close_point : bool = computed_distance <= DISTANCE_SEARCH
+            
+            #if this observation point isn't within the search distance, or the observation is already associated, or the computed distance is not better, skip iteration
+            if not is_close_point or obs_point in used_observations or association_dict.get((map_index, obs_index), float('inf')) <= computed_distance:
+                continue
+            else:
+                if (map_index, obs_index) in association_dict and association_dict[(map_index, obs_index)] > computed_distance:
+                    used_observations.remove(observations[obs_index])
+                association_dict[(map_index, obs_index)] = computed_distance
+                used_observations.add(obs_point)
+
+    return list(association_dict.keys())
 
 
 # ---------------------------------------------------------------------------
@@ -88,7 +108,24 @@ def correct_map(
         The corrected map: a list of ``(x, y)`` tuples with the same length
         and the same order as ``map_points``.
     """
-    raise NotImplementedError("Step 4 (map correction) is yours to implement")
+    
+    corrected_map : Map = []
+
+    associated_indices = {map_index for map_index, obs_index in associations}
+    missing_indices = [ ind for ind, _ in enumerate(map_points) if ind not in associated_indices ]
+    associated_dict = dict(associations)
+
+    for map_index, _ in enumerate(map_points):
+        if map_index in missing_indices:
+            corrected_map.append(map_points[map_index])
+            continue
+
+        obs_index = associated_dict.get(map_index)
+        map_coord = map_points[map_index]
+        obs_coord = observations[obs_index]
+        corrected_coord = (map_coord[0] + obs_coord[0]) / 2, (map_coord[1] + obs_coord[1]) / 2
+        corrected_map.append(corrected_coord)
+    return corrected_map
 
 
 # ---------------------------------------------------------------------------
