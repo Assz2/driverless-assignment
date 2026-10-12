@@ -54,7 +54,6 @@ def path_length(points: List[Point], path: List[int]) -> float:
 # Step 3 -- Data association (yours to implement)
 # ---------------------------------------------------------------------------
 
-DISTANCE_SEARCH = 1.0 # arbitrary distance threshold
 def associate(map_points: Map, observations: List[Point]) -> List[Tuple[int, int]]:
     """Associate every observation with the map point it was generated from.
 
@@ -66,27 +65,68 @@ def associate(map_points: Map, observations: List[Point]) -> List[Tuple[int, int
         tuples, e.g. ``[(0, 12), (3, 5)]`` means that observation 12 was
         generated from map point 0, and observation 5 from map point 3.
     """
-    # (map_index, obs_index) : distance
-    association_dict : dict[Tuple[int, int], float] = {}
-    used_observations : set[Point] = set()
+    matrix_distances : List[List[float]] = []
+    absolute_min : float = float('inf')
+    absolute_max : float = float('-inf')
+    already_associated_index : dict[int, float] = {}
+    result : List[Tuple[int, int]] = []
+    correction_cols_indexes : dict[int, List[int]] = {}
 
-    for map_index, map_point in enumerate(map_points):
+    # create distance matrix -> row is map_index, col is obs_index
+    for map_point in map_points:
+        row : List[float] = []
         for obs_index, obs_point in enumerate(observations):
-            # search distance from map point to each observation point
-            computed_distance = math.dist(map_point, obs_point)
-            is_close_point : bool = computed_distance <= DISTANCE_SEARCH
-            
-            #if this observation point isn't within the search distance, or the observation is already associated, or the computed distance is not better, skip iteration
-            if not is_close_point or obs_point in used_observations or association_dict.get((map_index, obs_index), float('inf')) <= computed_distance:
+            distance = math.dist(map_point, obs_point)
+
+            # search for absolute min and max distances for creating an artificial data-based threshold to categorize non associated points
+            if distance < absolute_min: absolute_min = distance
+            if distance > absolute_max: absolute_max = distance
+            row.append(distance)
+        matrix_distances.append(row)
+    threshold_distance = (absolute_max - absolute_min) / 10
+
+
+    for row_idx, row in enumerate(matrix_distances):
+        min_distance = float('inf')
+        obs_index = -1
+
+        for col, distance in enumerate(row):
+            # if the distance is greater than the threshold, skip iteration
+            if distance > threshold_distance:
                 continue
-            else:
-                if (map_index, obs_index) in association_dict and association_dict[(map_index, obs_index)] > computed_distance:
-                    used_observations.remove(observations[obs_index])
-                association_dict[(map_index, obs_index)] = computed_distance
-                used_observations.add(obs_point)
 
-    return list(association_dict.keys())
+            if col in already_associated_index:
+                # if the observation has been already used and the current distance is greater than the stored one, skip iteration
+                if distance >= already_associated_index[col]:
+                    continue
 
+                # else the observation has been already used and the current distance is less than the stored one 
+                # -> this observation better suits the current map point, change the association
+                else:
+                    map_idx_to_fix = -1
+                    for i, (map_idx, obs_idx) in enumerate(result):
+                        if obs_idx == col:
+                            map_idx_to_fix = result[i][0]
+                            break
+
+                    if map_idx_to_fix not in correction_cols_indexes:
+                        correction_cols_indexes[map_idx_to_fix] = []
+                    correction_cols_indexes[map_idx_to_fix].append(col)
+
+                    _, new_obs_idx = min( (distance, j) for j, distance in enumerate(matrix_distances[map_idx_to_fix]) if j not in correction_cols_indexes.get(map_idx_to_fix, []))
+                    result[i] = (map_idx, new_obs_idx)
+                         
+            if distance < min_distance:
+                min_distance = distance
+                obs_index = col
+
+        # if the map point is associated with one observation, save it to the result list
+        if min_distance != float('inf'):
+            result.append((row_idx, obs_index))
+            already_associated_index[obs_index] = min_distance
+
+
+    return result
 
 # ---------------------------------------------------------------------------
 # Step 4 -- Map correction (yours to implement)
@@ -149,7 +189,26 @@ def find_path(corrected_map: Map) -> List[int]:
       arrow (arrows that only touch at a shared node do not count as
       crossings). You can check it visually with ``visualize_path``.
     """
-    raise NotImplementedError("Step 5 (path finding) is yours to implement")
+
+    visit_order_indexes : List[int] = []
+    # given a node in the corrected map, find the nearest neighbour node that has not been visited yet
+    for index, coord in enumerate(corrected_map):
+        i = index + 1
+        nn_index = -1
+        min_distance = float('inf')
+        while i < len(corrected_map):
+            nn_distance = math.dist(coord, corrected_map[i])
+            if nn_distance < min_distance:
+                print("Better distance found: ", {nn_distance})
+                min_distance = nn_distance
+                nn_index = i
+            i += 1
+        # it's the last index
+        if nn_index == -1:
+            nn_index = index
+        visit_order_indexes.append(nn_index)
+
+    return visit_order_indexes
 
 
 # ---------------------------------------------------------------------------
