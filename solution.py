@@ -190,25 +190,64 @@ def find_path(corrected_map: Map) -> List[int]:
       crossings). You can check it visually with ``visualize_path``.
     """
 
+    matrix_distances : List[List[float]] = []
     visit_order_indexes : List[int] = []
-    # given a node in the corrected map, find the nearest neighbour node that has not been visited yet
-    for index, coord in enumerate(corrected_map):
-        i = index + 1
-        nn_index = -1
-        min_distance = float('inf')
-        while i < len(corrected_map):
-            nn_distance = math.dist(coord, corrected_map[i])
-            if nn_distance < min_distance:
-                print("Better distance found: ", {nn_distance})
-                min_distance = nn_distance
-                nn_index = i
-            i += 1
-        # it's the last index
-        if nn_index == -1:
-            nn_index = index
-        visit_order_indexes.append(nn_index)
+
+    for row_point in corrected_map:
+        row : List[Point] = []
+        for col_point in corrected_map:
+            distance = math.dist(row_point, col_point)
+            # this checks if row_idx == col_idx
+            if distance == 0:  distance = float('inf') 
+            row.append(distance)
+
+        matrix_distances.append(row)
+
+
+    already_visited : set = set()
+    position_idx = 0
+    visit_order_indexes.append(0)
+    
+    while len(already_visited) < len(corrected_map):
+        min_dist : float = float('inf')
+        save_idx = -1
+        row = corrected_map[position_idx]
+
+        for col_idx, col in enumerate(corrected_map):
+            if col_idx in already_visited or col_idx == position_idx:
+                continue
+
+            dist = math.dist(corrected_map[position_idx], col)
+            if dist < min_dist:
+                min_dist = dist
+                save_idx = col_idx
+                
+        already_visited.add(save_idx)
+        already_visited.add(position_idx)
+        position_idx = save_idx
+        visit_order_indexes.append(position_idx)
 
     return visit_order_indexes
+
+
+    # given a node in the corrected map, find the nearest neighbour node that has not been visited yet
+    # for index, coord in enumerate(corrected_map):
+    #     i = index + 1
+    #     nn_index = -1
+    #     min_distance = float('inf')
+    #     while i < len(corrected_map):
+    #         nn_distance = math.dist(coord, corrected_map[i])
+    #         if nn_distance < min_distance:
+    #             print("Better distance found: ", {nn_distance})
+    #             min_distance = nn_distance
+    #             nn_index = i
+    #         i += 1
+    #     # it's the last index
+    #     if nn_index == -1:
+    #         nn_index = index
+    #     visit_order_indexes.append(nn_index)
+
+    # return visit_order_indexes
 
 
 # ---------------------------------------------------------------------------
