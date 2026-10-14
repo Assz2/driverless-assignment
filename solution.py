@@ -161,11 +161,15 @@ def correct_map(
         The corrected map: a list of ``(x, y)`` tuples with the same length
         and the same order as ``map_points``.
     """
-    
     corrected_map : Map = []
 
-    associated_indices = {map_index for map_index, obs_index in associations}
-    missing_indices = [ ind for ind, _ in enumerate(map_points) if ind not in associated_indices ]
+    # set of map_points idxs observed (correctly associated)
+    associated_indices = {map_index for map_index, _ in associations}
+
+    # set of indxs of map_point without association
+    missing_indices = { ind for ind, _ in enumerate(map_points) if ind not in associated_indices }
+
+    # key - map_indxs, value - obs_indxs
     associated_dict = dict(associations)
 
     for map_index, _ in enumerate(map_points):
@@ -174,8 +178,8 @@ def correct_map(
             continue
 
         obs_index = associated_dict.get(map_index)
-        map_coord = map_points[map_index]
-        obs_coord = observations[obs_index]
+        map_coord : Tuple[int, int] = map_points[map_index]
+        obs_coord : Tuple[int, int] = observations[obs_index]
         corrected_coord = (map_coord[0] + obs_coord[0]) / 2, (map_coord[1] + obs_coord[1]) / 2
         corrected_map.append(corrected_coord)
     return corrected_map
