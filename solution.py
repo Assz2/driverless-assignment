@@ -66,65 +66,78 @@ def associate(map_points: Map, observations: List[Point]) -> List[Tuple[int, int
         generated from map point 0, and observation 5 from map point 3.
     """
     matrix_distances : List[List[float]] = []
-    absolute_min : float = float('inf')
-    absolute_max : float = float('-inf')
+    absolute_min = float('inf')
+    absolute_max = float('-inf')
+    correction_cols_indexes : dict[int, List[int]] = {}
     already_associated_index : dict[int, float] = {}
     result : List[Tuple[int, int]] = []
-    correction_cols_indexes : dict[int, List[int]] = {}
 
-    # create distance matrix -> row is map_index, col is obs_index
+    # iterations to create matrix of distances -> row is map_index, col is obs_index
     for map_point in map_points:
         row : List[float] = []
-        for obs_index, obs_point in enumerate(observations):
+        for obs_point in observations:
             distance = math.dist(map_point, obs_point)
 
             # search for absolute min and max distances for creating an artificial data-based threshold to categorize non associated points
             if distance < absolute_min: absolute_min = distance
             if distance > absolute_max: absolute_max = distance
+
             row.append(distance)
         matrix_distances.append(row)
+    # artificial data-based threshold
     threshold_distance = (absolute_max - absolute_min) / 10
 
-
+    # iterations to associate data points
     for row_idx, row in enumerate(matrix_distances):
         min_distance = float('inf')
         obs_index = -1
 
-        for col, distance in enumerate(row):
+        for col_idx, distance in enumerate(row):
             # if the distance is greater than the threshold, skip iteration
             if distance > threshold_distance:
                 continue
 
-            if col in already_associated_index:
-                # if the observation has been already used and the current distance is greater than the stored one, skip iteration
-                if distance >= already_associated_index[col]:
-                    continue
+            if col_idx in already_associated_index:
+                # if the observation has been already used and the current distance is greater than the already associated one, 
+                # skip iteration
+                if distance >= already_associated_index[col_idx]: continue
 
-                # else the observation has been already used and the current distance is less than the stored one 
+                # if the observation has been already used 
+                # but the current distance is less than the distance of the already associated map_points - observation 
                 # -> this observation better suits the current map point, change the association
                 else:
-                    map_idx_to_fix = -1
-                    for i, (map_idx, obs_idx) in enumerate(result):
-                        if obs_idx == col:
-                            map_idx_to_fix = result[i][0]
+                    # we need to backtrack -> extract related map_point, reassociate it with another observation, 
+                    # append this observation to the correct map_point
+                    backtracking_map_idx = -1
+                    i = 0
+
+                    # here I want to find the map_idx to which change observation. I am extracting the map_idx from result collection
+                    # algorithm invariant -> ater this loop, backtracking_map_idx should never be -1 
+                    for _, obs_idx_result in result:
+                        if obs_idx_result == col_idx:
+                            backtracking_map_idx = result[i][0]
                             break
+                        i += 1
 
-                    if map_idx_to_fix not in correction_cols_indexes:
-                        correction_cols_indexes[map_idx_to_fix] = []
-                    correction_cols_indexes[map_idx_to_fix].append(col)
+                    # correction_cols_indexes is a dictionary: 
+                    # key - map_idx to backtrack, values - list of nodes that better suits the actua map_point 
+                    if backtracking_map_idx not in correction_cols_indexes: correction_cols_indexes[backtracking_map_idx] = []
+                    correction_cols_indexes[backtracking_map_idx].append(col_idx)
 
-                    _, new_obs_idx = min( (distance, j) for j, distance in enumerate(matrix_distances[map_idx_to_fix]) if j not in correction_cols_indexes.get(map_idx_to_fix, []))
-                    result[i] = (map_idx, new_obs_idx)
+                    # new column (observation) index to associate for backtracked map_point (row corresponding to matrix_distances[backtracking_map_idx]) 
+                    # -> result collection is edited
+                    new_obs_idx, dist = min( (j, distance) for j, distance in enumerate(matrix_distances[backtracking_map_idx]) if j not in correction_cols_indexes.get(backtracking_map_idx, []))
+                    already_associated_index[new_obs_idx] = dist
+                    result[i] = (backtracking_map_idx, new_obs_idx)
                          
-            if distance < min_distance:
+            elif distance < min_distance:
                 min_distance = distance
-                obs_index = col
+                obs_index = col_idx
 
         # if the map point is associated with one observation, save it to the result list
-        if min_distance != float('inf'):
+        if obs_index != -1:
             result.append((row_idx, obs_index))
             already_associated_index[obs_index] = min_distance
-
 
     return result
 
